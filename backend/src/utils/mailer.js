@@ -25,9 +25,9 @@ const sendOtpEmail = async (email, otp, purpose = 'registration') => {
     secure,
     auth: { user, pass },
     tls: { rejectUnauthorized: false },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: 4000, // 4s timeout for fast failover on blocked cloud host ports
+    greetingTimeout: 4000,
+    socketTimeout: 8000,
   });
 
   const title = purpose === 'login' ? 'Login Verification Code' : 'Email Verification Code';
@@ -72,6 +72,9 @@ const sendOtpEmail = async (email, otp, purpose = 'registration') => {
     return { success: true, messageId: info.messageId, otp };
   } catch (error) {
     console.error(`[SMTP Mailer Error] Failed to send OTP to ${email}:`, error.message);
+    if (error.message.toLowerCase().includes('timeout') || error.code === 'ETIMEDOUT') {
+      console.error('[SMTP Connection Timeout Hint] Render firewall is blocking outbound TCP port 587. Please change SMTP_PORT in Render environment variables to 465 (with SMTP_SECURE=true) or port 2525.');
+    }
     return { success: false, error: error.message, otp };
   }
 };
