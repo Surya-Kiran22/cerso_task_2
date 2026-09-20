@@ -46,7 +46,11 @@ const getTransporter = () => {
 };
 
 const sendOtpEmail = async (email, otp, purpose = 'registration') => {
-  const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@srs-ambiguity-detector.com';
+  const configuredFrom = process.env.SMTP_FROM;
+  const fromEmail = (configuredFrom && !configuredFrom.includes('srs-ambiguity-detector.com'))
+    ? configuredFrom
+    : (process.env.SMTP_USER || 'no-reply@srs-ambiguity-detector.com');
+
   const transporter = getTransporter();
 
   const title = purpose === 'login' ? 'Login Verification Code' : 'Email Verification Code';
@@ -97,6 +101,9 @@ const sendOtpEmail = async (email, otp, purpose = 'registration') => {
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error(`[SMTP Mailer Error] Failed to send OTP to ${email}:`, error.message);
+    if (error.message.includes('535') || error.message.includes('Authentication failed')) {
+      console.error('[SMTP Mailer Diagnostic] Brevo rejected your SMTP_PASS! Ensure SMTP_PASS in Render Environment Variables is set to your Brevo SMTP Key (starts with xsmtpsib-...) generated under Brevo Dashboard -> Transactional -> SMTP & API -> SMTP Keys.');
+    }
     cachedTransporter = null; // Reset transporter pool on error so fresh connection is attempted next time
     return { success: false, error: error.message, otp };
   }
