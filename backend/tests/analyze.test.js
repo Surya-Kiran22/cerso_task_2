@@ -16,23 +16,27 @@ beforeAll(async () => {
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri);
 
-  // Register User A
-  const resA = await request(app).post('/api/auth/register').send({
+  // Register & Verify User A
+  await request(app).post('/api/auth/register').send({
     name: 'User A',
     email: 'usera@example.com',
     password: 'password123',
   });
-  userAToken = resA.body.token;
-  userAId = resA.body.user._id;
+  const userA = await User.findOne({ email: 'usera@example.com' }).select('+verificationToken');
+  const verifyResA = await request(app).post('/api/auth/verify-email').send({ token: userA.verificationToken });
+  userAToken = verifyResA.body.token;
+  userAId = verifyResA.body.user._id;
 
-  // Register User B
-  const resB = await request(app).post('/api/auth/register').send({
+  // Register & Verify User B
+  await request(app).post('/api/auth/register').send({
     name: 'User B',
     email: 'userb@example.com',
     password: 'password123',
   });
-  userBToken = resB.body.token;
-  userBId = resB.body.user._id;
+  const userB = await User.findOne({ email: 'userb@example.com' }).select('+verificationToken');
+  const verifyResB = await request(app).post('/api/auth/verify-email').send({ token: userB.verificationToken });
+  userBToken = verifyResB.body.token;
+  userBId = verifyResB.body.user._id;
 });
 
 afterAll(async () => {

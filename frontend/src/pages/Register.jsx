@@ -8,9 +8,9 @@ export const Register = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
 
   const { register } = useContext(AuthContext);
-  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,13 +19,32 @@ export const Register = () => {
 
     try {
       await register(name, email, password);
-      navigate('/analyze');
+      setIsRegistered(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (isRegistered) {
+    return (
+      <div className="container" style={{ maxWidth: '450px', marginTop: '40px' }}>
+        <div className="card" style={{ textAlign: 'center' }}>
+          <h2>Check Your Email</h2>
+          <div style={{ color: '#16a34a', fontSize: '16px', margin: '20px 0', padding: '12px', background: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+            Registration successful! A verification email has been sent to <strong>{email}</strong>.
+          </div>
+          <p style={{ color: '#4b5563', lineHeight: '1.5', marginBottom: '20px' }}>
+            Please check your inbox and click on the verification link to activate your account before logging in.
+          </p>
+          <Link to="/login" className="button" style={{ display: 'inline-block', textDecoration: 'none' }}>
+            Go to Login
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container" style={{ maxWidth: '450px', marginTop: '40px' }}>

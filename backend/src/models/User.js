@@ -20,6 +20,18 @@ const userSchema = new mongoose.Schema(
       required: [true, 'Password hash is required'],
       select: false,
     },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: {
+      type: String,
+      select: false,
+    },
+    verificationTokenExpires: {
+      type: Date,
+      select: false,
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
@@ -29,6 +41,8 @@ const userSchema = new mongoose.Schema(
 userSchema.set('toJSON', {
   transform: (doc, ret) => {
     delete ret.passwordHash;
+    delete ret.verificationToken;
+    delete ret.verificationTokenExpires;
     delete ret.__v;
     return ret;
   },

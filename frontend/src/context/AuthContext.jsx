@@ -36,20 +36,34 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const res = await client.post('/auth/login', { email, password });
     const { token: newToken, user: newUser } = res.data;
-    setToken(newToken);
-    setUser(newUser);
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
+    if (newToken) {
+      setToken(newToken);
+      setUser(newUser);
+      localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(newUser));
+    }
     return res.data;
   };
 
   const register = async (name, email, password) => {
     const res = await client.post('/auth/register', { name, email, password });
+    return res.data;
+  };
+
+  const verifyEmail = async (verificationToken) => {
+    const res = await client.post('/auth/verify-email', { token: verificationToken });
     const { token: newToken, user: newUser } = res.data;
-    setToken(newToken);
-    setUser(newUser);
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
+    if (newToken) {
+      setToken(newToken);
+      setUser(newUser);
+      localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(newUser));
+    }
+    return res.data;
+  };
+
+  const resendVerification = async (email) => {
+    const res = await client.post('/auth/resend-verification', { email });
     return res.data;
   };
 
@@ -61,7 +75,18 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        register,
+        verifyEmail,
+        resendVerification,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
