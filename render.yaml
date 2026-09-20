@@ -20,7 +20,7 @@ services:
         sync: false
 
   # React + Vite Static Frontend Site (Free on Render)
-  - type: static
+  - type: static_site
     name: srs-ambiguity-detector-frontend
     rootDir: frontend
     buildCommand: npm install && npm run build
