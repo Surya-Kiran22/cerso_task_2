@@ -3,10 +3,11 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 export const Login = () => {
-  const [step, setStep] = useState(1); // 1: Password Form, 2: OTP Verification Form
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
+  const [devOtp, setDevOtp] = useState('');
   const [otpPurpose, setOtpPurpose] = useState('login');
 
   const [error, setError] = useState('');
@@ -21,6 +22,7 @@ export const Login = () => {
     e.preventDefault();
     setError('');
     setInfoMessage('');
+    setDevOtp('');
     setLoading(true);
 
     try {
@@ -28,6 +30,9 @@ export const Login = () => {
       if (data.requireOtp) {
         setStep(2);
         setOtpPurpose(data.purpose || 'login');
+        if (data.devOtp) {
+          setDevOtp(data.devOtp);
+        }
         setInfoMessage(data.message || `A 6-digit OTP code has been sent to ${email}`);
       } else {
         navigate('/analyze');
@@ -37,6 +42,9 @@ export const Login = () => {
       if (errData?.requireOtp) {
         setStep(2);
         setOtpPurpose(errData.purpose || 'registration');
+        if (errData.devOtp) {
+          setDevOtp(errData.devOtp);
+        }
         setInfoMessage(errData.error || `A 6-digit OTP code has been sent to ${email}`);
       } else {
         setError(errData?.error || 'Login failed. Please check your credentials.');
@@ -72,6 +80,9 @@ export const Login = () => {
     setInfoMessage('');
     try {
       const data = await resendOtp(email, otpPurpose);
+      if (data?.devOtp) {
+        setDevOtp(data.devOtp);
+      }
       setInfoMessage(data.message || 'A new 6-digit OTP code has been sent to your email.');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to resend OTP code.');
@@ -89,6 +100,12 @@ export const Login = () => {
         {infoMessage && (
           <div style={{ color: '#16a34a', padding: '10px', background: '#f0fdf4', borderRadius: '4px', marginBottom: '16px', border: '1px solid #bbf7d0', fontSize: '14px' }}>
             {infoMessage}
+          </div>
+        )}
+
+        {devOtp && step === 2 && (
+          <div style={{ padding: '10px 14px', background: '#eff6ff', borderRadius: '6px', border: '1px dashed #3b82f6', marginBottom: '16px', fontSize: '14px', color: '#1d4ed8', textAlign: 'center' }}>
+            <strong>[Testing Helper OTP]</strong>: <code style={{ fontSize: '18px', fontWeight: 'bold' }}>{devOtp}</code>
           </div>
         )}
 

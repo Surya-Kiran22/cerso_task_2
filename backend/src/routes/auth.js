@@ -57,6 +57,7 @@ router.post(
     });
 
     const emailResult = await sendOtpEmail(user.email, otpCode, 'registration');
+    const includeDevOtp = emailResult.mocked || !emailResult.success || process.env.SHOW_DEV_OTP === 'true' || process.env.NODE_ENV !== 'production';
 
     res.status(201).json({
       requireOtp: true,
@@ -64,7 +65,8 @@ router.post(
       email: user.email,
       message: emailResult.success
         ? 'Registration initiated. Please enter the 6-digit OTP code sent to your email address.'
-        : `Registration initiated. (Email Delivery Warning: ${emailResult.error || 'SMTP delivery issue'}. Please check your inbox or resend OTP.)`,
+        : `Registration initiated. (Email Delivery Notice: ${emailResult.error || 'Check inbox or use code below'})`,
+      devOtp: includeDevOtp ? otpCode : undefined,
     });
   })
 );
@@ -153,12 +155,14 @@ router.post(
       await user.save();
 
       const emailResult = await sendOtpEmail(user.email, otpCode, 'registration');
+      const includeDevOtp = emailResult.mocked || !emailResult.success || process.env.SHOW_DEV_OTP === 'true' || process.env.NODE_ENV !== 'production';
 
       return res.status(403).json({
         requireOtp: true,
         purpose: 'registration',
         email: user.email,
         error: 'Please verify your email address. A 6-digit registration OTP code has been sent to your inbox.',
+        devOtp: includeDevOtp ? otpCode : undefined,
       });
     }
 
@@ -168,6 +172,7 @@ router.post(
     await user.save();
 
     const emailResult = await sendOtpEmail(user.email, otpCode, 'login');
+    const includeDevOtp = emailResult.mocked || !emailResult.success || process.env.SHOW_DEV_OTP === 'true' || process.env.NODE_ENV !== 'production';
 
     res.json({
       requireOtp: true,
@@ -175,7 +180,8 @@ router.post(
       email: user.email,
       message: emailResult.success
         ? 'A 6-digit OTP code has been sent to your email address. Enter the code to complete login.'
-        : `OTP generated. (Delivery Notice: ${emailResult.error || 'SMTP delivery issue'})`,
+        : `OTP generated. (Delivery Notice: ${emailResult.error || 'Check inbox or use code below'})`,
+      devOtp: includeDevOtp ? otpCode : undefined,
     });
   })
 );
@@ -258,11 +264,13 @@ router.post(
     await user.save();
 
     const emailResult = await sendOtpEmail(user.email, otpCode, targetPurpose);
+    const includeDevOtp = emailResult.mocked || !emailResult.success || process.env.SHOW_DEV_OTP === 'true' || process.env.NODE_ENV !== 'production';
 
     res.json({
       message: emailResult.success
         ? `A new 6-digit OTP code has been sent to ${user.email}.`
-        : `New OTP generated for ${user.email}. (Email delivery issue: ${emailResult.error || 'SMTP delivery issue'})`,
+        : `New OTP generated for ${user.email}. (Email delivery notice: ${emailResult.error || 'Check inbox or use code below'})`,
+      devOtp: includeDevOtp ? otpCode : undefined,
     });
   })
 );

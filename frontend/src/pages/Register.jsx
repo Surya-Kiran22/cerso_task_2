@@ -3,11 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 export const Register = () => {
-  const [step, setStep] = useState(1); // 1: Info Form, 2: OTP Verification Form
+  const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
+  const [devOtp, setDevOtp] = useState('');
 
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
@@ -21,11 +22,15 @@ export const Register = () => {
     e.preventDefault();
     setError('');
     setInfoMessage('');
+    setDevOtp('');
     setLoading(true);
 
     try {
       const data = await register(name, email, password);
       setStep(2);
+      if (data?.devOtp) {
+        setDevOtp(data.devOtp);
+      }
       setInfoMessage(data.message || `A 6-digit OTP code has been sent to ${email}`);
     } catch (err) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
@@ -56,6 +61,9 @@ export const Register = () => {
     setInfoMessage('');
     try {
       const data = await resendOtp(email, 'registration');
+      if (data?.devOtp) {
+        setDevOtp(data.devOtp);
+      }
       setInfoMessage(data.message || 'A new 6-digit OTP code has been sent to your email.');
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to resend OTP code.');
@@ -73,6 +81,12 @@ export const Register = () => {
         {infoMessage && (
           <div style={{ color: '#16a34a', padding: '10px', background: '#f0fdf4', borderRadius: '4px', marginBottom: '16px', border: '1px solid #bbf7d0', fontSize: '14px' }}>
             {infoMessage}
+          </div>
+        )}
+
+        {devOtp && step === 2 && (
+          <div style={{ padding: '10px 14px', background: '#eff6ff', borderRadius: '6px', border: '1px dashed #3b82f6', marginBottom: '16px', fontSize: '14px', color: '#1d4ed8', textAlign: 'center' }}>
+            <strong>[Testing Helper OTP]</strong>: <code style={{ fontSize: '18px', fontWeight: 'bold' }}>{devOtp}</code>
           </div>
         )}
 
