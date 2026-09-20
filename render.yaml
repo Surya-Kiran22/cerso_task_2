@@ -1,5 +1,5 @@
 services:
-  # Express Backend REST API Service (Free Tier)
+  # Express Backend REST API Web Service (Free Tier)
   - type: web
     name: srs-ambiguity-detector-backend
     env: node
@@ -19,18 +19,13 @@ services:
       - key: CLIENT_ORIGIN
         sync: false
 
-  # React + Vite Static Frontend Web Service (Free Tier)
-  - type: web
+  # React + Vite Static Frontend Site (Free on Render)
+  - type: static
     name: srs-ambiguity-detector-frontend
-    env: static
-    plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
-    staticPublishPath: frontend/dist
+    staticPublishPath: dist
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
-    envVars:
-      - key: VITE_API_URL
-        sync: false
