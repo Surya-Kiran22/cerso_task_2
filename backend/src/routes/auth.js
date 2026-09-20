@@ -21,13 +21,6 @@ const generateOtp = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// Helper for non-blocking email dispatch
-const dispatchOtpEmail = (email, otpCode, purpose) => {
-  sendOtpEmail(email, otpCode, purpose).catch((err) => {
-    console.error(`[Async Email Dispatch Error] Failed to send OTP to ${email}:`, err);
-  });
-};
-
 // @route   POST /api/auth/register
 // @desc    Register a new user & send 6-digit registration OTP email
 // @access  Public
@@ -51,7 +44,7 @@ router.post(
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
     const otpCode = generateOtp();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
 
     const user = await User.create({
       name,
@@ -63,14 +56,15 @@ router.post(
       otpPurpose: 'registration',
     });
 
-    // Send OTP email in background for instant API response
-    dispatchOtpEmail(user.email, otpCode, 'registration');
+    const emailResult = await sendOtpEmail(user.email, otpCode, 'registration');
 
     res.status(201).json({
       requireOtp: true,
       purpose: 'registration',
       email: user.email,
-      message: 'Registration initiated. Please enter the 6-digit OTP code sent to your email address.',
+      message: emailResult.success
+        ? 'Registration initiated. Please enter the 6-digit OTP code sent to your email address.'
+        : `Registration initiated. (Email Delivery Warning: ${emailResult.error || 'SMTP delivery issue'}. Please check your inbox or resend OTP.)`,
     });
   })
 );
@@ -158,7 +152,7 @@ router.post(
       user.otpPurpose = 'registration';
       await user.save();
 
-      dispatchOtpEmail(user.email, otpCode, 'registration');
+      const emailResult = await sendOtpEmail(user.email, otpCode, 'registration');
 
       return res.status(403).json({
         requireOtp: true,
@@ -173,13 +167,15 @@ router.post(
     user.otpPurpose = 'login';
     await user.save();
 
-    dispatchOtpEmail(user.email, otpCode, 'login');
+    const emailResult = await sendOtpEmail(user.email, otpCode, 'login');
 
     res.json({
       requireOtp: true,
       purpose: 'login',
       email: user.email,
-      message: 'A 6-digit OTP code has been sent to your email address. Enter the code to complete login.',
+      message: emailResult.success
+        ? 'A 6-digit OTP code has been sent to your email address. Enter the code to complete login.'
+        : `OTP generated. (Delivery Notice: ${emailResult.error || 'SMTP delivery issue'})`,
     });
   })
 );
@@ -261,10 +257,12 @@ router.post(
     user.otpPurpose = targetPurpose;
     await user.save();
 
-    dispatchOtpEmail(user.email, otpCode, targetPurpose);
+    const emailResult = await sendOtpEmail(user.email, otpCode, targetPurpose);
 
     res.json({
-      message: `A new 6-digit OTP code has been sent to ${user.email}.`,
+      message: emailResult.success
+        ? `A new 6-digit OTP code has been sent to ${user.email}.`
+        : `New OTP generated for ${user.email}. (Email delivery issue: ${emailResult.error || 'SMTP delivery issue'})`,
     });
   })
 );

@@ -1,57 +1,34 @@
 const nodemailer = require('nodemailer');
 
-let cachedTransporter = null;
-
-const getTransporter = () => {
-  if (cachedTransporter) {
-    return cachedTransporter;
-  }
-
+const sendOtpEmail = async (email, otp, purpose = 'registration') => {
   const host = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
   const port = parseInt(process.env.SMTP_PORT || '587', 10);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
 
-  // Determine secure mode: true for port 465, false for 587, 2525, 1022, 1109, etc.
-  let secure = port === 465;
-  if (process.env.SMTP_SECURE !== undefined) {
-    secure = process.env.SMTP_SECURE === 'true';
-  }
+  const secure = port === 465 || process.env.SMTP_SECURE === 'true';
 
   if (!user || !pass) {
-    return null;
+    console.log(`[SMTP Mailer Notice] Real email NOT sent because SMTP_USER or SMTP_PASS is missing in backend/.env.`);
+    console.log(`[SMTP Mailer OTP Debug] Generated OTP for ${email} (${purpose}): ${otp}`);
+    return { success: true, mocked: true, otp };
   }
 
-  console.log(`[SMTP Mailer Init] Creating SMTP transporter for host=${host}, port=${port}, secure=${secure}, user=${user}`);
-
-  cachedTransporter = nodemailer.createTransport({
-    host,
-    port,
-    secure,
-    auth: {
-      user,
-      pass,
-    },
-    tls: {
-      rejectUnauthorized: false, // Allow STARTTLS / custom certificates
-    },
-    pool: true,
-    maxConnections: 5,
-    maxMessages: 100,
-    rateDelta: 1000,
-    rateLimit: 10,
-  });
-
-  return cachedTransporter;
-};
-
-const sendOtpEmail = async (email, otp, purpose = 'registration') => {
   const configuredFrom = process.env.SMTP_FROM;
   const fromEmail = (configuredFrom && !configuredFrom.includes('srs-ambiguity-detector.com'))
     ? configuredFrom
-    : (process.env.SMTP_USER || 'no-reply@srs-ambiguity-detector.com');
+    : user;
 
-  const transporter = getTransporter();
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass },
+    tls: { rejectUnauthorized: false },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  });
 
   const title = purpose === 'login' ? 'Login Verification Code' : 'Email Verification Code';
   const actionText = purpose === 'login' 
@@ -83,12 +60,6 @@ const sendOtpEmail = async (email, otp, purpose = 'registration') => {
 
   const textContent = `${title}:\n\nYour 6-digit OTP code is: ${otp}\n\nThis code will expire in 10 minutes.`;
 
-  if (!transporter) {
-    console.log(`[SMTP Mailer Warning] Real email NOT sent because SMTP_USER or SMTP_PASS is missing in backend/.env.`);
-    console.log(`[SMTP Mailer OTP Debug] Generated OTP for ${email} (${purpose}): ${otp}`);
-    return { success: true, mocked: true, otp };
-  }
-
   try {
     const info = await transporter.sendMail({
       from: `"SRS Ambiguity Detector" <${fromEmail}>`,
@@ -97,14 +68,10 @@ const sendOtpEmail = async (email, otp, purpose = 'registration') => {
       text: textContent,
       html: htmlContent,
     });
-    console.log(`[SMTP Mailer] Email sent successfully to ${email} (${purpose}): ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    console.log(`[SMTP Mailer Success] OTP email sent successfully to ${email} (${purpose}): ${info.messageId}`);
+    return { success: true, messageId: info.messageId, otp };
   } catch (error) {
     console.error(`[SMTP Mailer Error] Failed to send OTP to ${email}:`, error.message);
-    if (error.message.includes('535') || error.message.includes('Authentication failed')) {
-      console.error('[SMTP Mailer Diagnostic] Brevo rejected your SMTP_PASS! Ensure SMTP_PASS in Render Environment Variables is set to your Brevo SMTP Key (starts with xsmtpsib-...) generated under Brevo Dashboard -> Transactional -> SMTP & API -> SMTP Keys.');
-    }
-    cachedTransporter = null; // Reset transporter pool on error so fresh connection is attempted next time
     return { success: false, error: error.message, otp };
   }
 };
