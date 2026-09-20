@@ -1,8 +1,9 @@
 services:
-  # Express Backend REST API Service
+  # Express Backend REST API Service (Free Tier)
   - type: web
     name: srs-ambiguity-detector-backend
     env: node
+    plan: free
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
@@ -18,10 +19,11 @@ services:
       - key: CLIENT_ORIGIN
         sync: false
 
-  # React + Vite Static Frontend Web Service
+  # React + Vite Static Frontend Web Service (Free Tier)
   - type: web
     name: srs-ambiguity-detector-frontend
     env: static
+    plan: free
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: frontend/dist
