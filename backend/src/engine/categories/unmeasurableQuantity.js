@@ -1,0 +1,23 @@
+module.exports = {
+  id: 'UNMEASURABLE_QUANTITY',
+  label: 'Unmeasurable Quantity',
+  severity: 'High',
+  weight: 3,
+  explanation: 'Unmeasurable terms fail to specify exact counts, thresholds, or units.',
+  suggestion: 'Replace with explicit numerical thresholds or ranges (e.g. "at least 50 concurrent users").',
+  words: [
+    'many',
+    'few',
+    'several',
+    'some',
+    'most',
+    'a lot',
+    'large',
+    'small',
+    'high',
+    'low',
+    'significant',
+    'as much as possible',
+    'large number of',
+  ],
+};

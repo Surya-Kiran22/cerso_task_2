@@ -1,0 +1,11 @@
+REQ-1: The user authentication system shall be fast and intuitive.
+REQ-2: The platform should handle many concurrent requests as much as possible.
+REQ-3: The system shall generate PDF reports if possible and where appropriate.
+REQ-4: Supported payment options include Credit Card, PayPal, wire transfer, etc.
+REQ-5: It shall process customer records and update the inventory database.
+REQ-6: The account registration form shall be validated before submission.
+REQ-7: The web dashboard shall present a beautiful, modern, and world-class interface.
+REQ-8: The system shall store transaction logs and the system shall send email notifications to administrators.
+REQ-9: The API microservice shall maintain high response time and continuous uptime.
+REQ-10: All incoming HTTP requests shall be tracked and logged without exception.
+REQ-11: Database maintenance backups shall be performed periodically or soon after midnight.

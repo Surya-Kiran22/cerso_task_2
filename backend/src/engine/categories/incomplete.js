@@ -1,0 +1,20 @@
+module.exports = {
+  id: 'INCOMPLETE',
+  label: 'Incomplete Requirement',
+  severity: 'High',
+  weight: 3,
+  explanation: 'Incomplete requirements leave open-ended placeholders or non-exhaustive lists that cannot be verified.',
+  suggestion: 'Provide a complete, closed list of elements or explicit specification of the missing items.',
+  words: [
+    'TBD',
+    'TBC',
+    'TBA',
+    'to be determined',
+    'etc.',
+    'and so on',
+    'and/or',
+    'such as',
+    'including but not limited to',
+    '...',
+  ],
+};
