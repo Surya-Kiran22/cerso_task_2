@@ -35,6 +35,11 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     const res = await client.post('/auth/login', { email, password });
+    return res.data;
+  };
+
+  const verifyLoginOtp = async (email, otp) => {
+    const res = await client.post('/auth/verify-login-otp', { email, otp });
     const { token: newToken, user: newUser } = res.data;
     if (newToken) {
       setToken(newToken);
@@ -50,8 +55,8 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
-  const verifyEmail = async (verificationToken) => {
-    const res = await client.post('/auth/verify-email', { token: verificationToken });
+  const verifyRegistrationOtp = async (email, otp) => {
+    const res = await client.post('/auth/verify-registration-otp', { email, otp });
     const { token: newToken, user: newUser } = res.data;
     if (newToken) {
       setToken(newToken);
@@ -62,8 +67,8 @@ export const AuthProvider = ({ children }) => {
     return res.data;
   };
 
-  const resendVerification = async (email) => {
-    const res = await client.post('/auth/resend-verification', { email });
+  const resendOtp = async (email, purpose) => {
+    const res = await client.post('/auth/resend-otp', { email, purpose });
     return res.data;
   };
 
@@ -81,9 +86,10 @@ export const AuthProvider = ({ children }) => {
         token,
         loading,
         login,
+        verifyLoginOtp,
         register,
-        verifyEmail,
-        resendVerification,
+        verifyRegistrationOtp,
+        resendOtp,
         logout,
       }}
     >

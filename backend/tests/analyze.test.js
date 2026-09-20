@@ -16,25 +16,25 @@ beforeAll(async () => {
   const mongoUri = mongoServer.getUri();
   await mongoose.connect(mongoUri);
 
-  // Register & Verify User A
+  // Register & Verify User A with OTP
   await request(app).post('/api/auth/register').send({
     name: 'User A',
     email: 'usera@example.com',
     password: 'password123',
   });
-  const userA = await User.findOne({ email: 'usera@example.com' }).select('+verificationToken');
-  const verifyResA = await request(app).post('/api/auth/verify-email').send({ token: userA.verificationToken });
+  const userA = await User.findOne({ email: 'usera@example.com' }).select('+otpCode');
+  const verifyResA = await request(app).post('/api/auth/verify-registration-otp').send({ email: 'usera@example.com', otp: userA.otpCode });
   userAToken = verifyResA.body.token;
   userAId = verifyResA.body.user._id;
 
-  // Register & Verify User B
+  // Register & Verify User B with OTP
   await request(app).post('/api/auth/register').send({
     name: 'User B',
     email: 'userb@example.com',
     password: 'password123',
   });
-  const userB = await User.findOne({ email: 'userb@example.com' }).select('+verificationToken');
-  const verifyResB = await request(app).post('/api/auth/verify-email').send({ token: userB.verificationToken });
+  const userB = await User.findOne({ email: 'userb@example.com' }).select('+otpCode');
+  const verifyResB = await request(app).post('/api/auth/verify-registration-otp').send({ email: 'userb@example.com', otp: userB.otpCode });
   userBToken = verifyResB.body.token;
   userBId = verifyResB.body.user._id;
 });

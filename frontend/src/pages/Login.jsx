@@ -3,32 +3,41 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
 export const Login = () => {
+  const [step, setStep] = useState(1); // 1: Password Form, 2: OTP Verification Form
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpPurpose, setOtpPurpose] = useState('login');
+
   const [error, setError] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
-  const [isUnverified, setIsUnverified] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
 
-  const { login, resendVerification } = useContext(AuthContext);
+  const { login, verifyLoginOtp, verifyRegistrationOtp, resendOtp } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setInfoMessage('');
-    setIsUnverified(false);
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/analyze');
+      const data = await login(email, password);
+      if (data.requireOtp) {
+        setStep(2);
+        setOtpPurpose(data.purpose || 'login');
+        setInfoMessage(data.message || `A 6-digit OTP code has been sent to ${email}`);
+      } else {
+        navigate('/analyze');
+      }
     } catch (err) {
       const errData = err.response?.data;
-      if (errData?.isVerified === false) {
-        setIsUnverified(true);
-        setError(errData.error || 'Please verify your email address before logging in.');
+      if (errData?.requireOtp) {
+        setStep(2);
+        setOtpPurpose(errData.purpose || 'registration');
+        setInfoMessage(errData.error || `A 6-digit OTP code has been sent to ${email}`);
       } else {
         setError(errData?.error || 'Login failed. Please check your credentials.');
       }
@@ -37,15 +46,35 @@ export const Login = () => {
     }
   };
 
-  const handleResend = async () => {
-    if (!email) return;
+  const handleOtpSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setInfoMessage('');
+    setLoading(true);
+
+    try {
+      if (otpPurpose === 'registration') {
+        await verifyRegistrationOtp(email, otp);
+      } else {
+        await verifyLoginOtp(email, otp);
+      }
+      navigate('/analyze');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid or expired OTP code. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
     setResending(true);
+    setError('');
     setInfoMessage('');
     try {
-      const res = await resendVerification(email);
-      setInfoMessage(res.message || 'Verification email resent successfully! Please check your inbox.');
+      const data = await resendOtp(email, otpPurpose);
+      setInfoMessage(data.message || 'A new 6-digit OTP code has been sent to your email.');
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to resend verification email.');
+      setError(err.response?.data?.error || 'Failed to resend OTP code.');
     } finally {
       setResending(false);
     }
@@ -54,61 +83,92 @@ export const Login = () => {
   return (
     <div className="container" style={{ maxWidth: '450px', marginTop: '40px' }}>
       <div className="card">
-        <h2>Login to SRS Ambiguity Detector</h2>
+        <h2>{step === 1 ? 'Login to SRS Ambiguity Detector' : 'Enter 6-Digit Verification Code'}</h2>
+
         {error && <div className="error-message">{error}</div>}
         {infoMessage && (
-          <div style={{ color: '#16a34a', padding: '10px', background: '#f0fdf4', borderRadius: '4px', marginBottom: '16px', border: '1px solid #bbf7d0' }}>
+          <div style={{ color: '#16a34a', padding: '10px', background: '#f0fdf4', borderRadius: '4px', marginBottom: '16px', border: '1px solid #bbf7d0', fontSize: '14px' }}>
             {infoMessage}
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div>
-            <label htmlFor="email">Email Address</label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="user@example.com"
-            />
-          </div>
+        {step === 1 ? (
+          <form onSubmit={handleLoginSubmit}>
+            <div>
+              <label htmlFor="email">Email Address</label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                placeholder="user@example.com"
+              />
+            </div>
 
-          <div>
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="******"
-            />
-          </div>
+            <div>
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="******"
+              />
+            </div>
 
-          <button type="submit" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-
-        {isUnverified && (
-          <div style={{ marginTop: '16px', padding: '12px', background: '#fffbeb', borderRadius: '6px', border: '1px solid #fde68a' }}>
-            <p style={{ margin: '0 0 8px 0', fontSize: '14px', color: '#92400e' }}>
-              Didn't receive the verification email or link expired?
-            </p>
-            <button
-              type="button"
-              onClick={handleResend}
-              disabled={resending}
-              style={{ background: '#d97706', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              {resending ? 'Sending...' : 'Resend Verification Email'}
+            <button type="submit" disabled={loading}>
+              {loading ? 'Authenticating...' : 'Login'}
             </button>
-          </div>
+          </form>
+        ) : (
+          <form onSubmit={handleOtpSubmit}>
+            <p style={{ color: '#4b5563', fontSize: '14px', marginBottom: '16px' }}>
+              Please enter the 6-digit OTP sent to <strong>{email}</strong>
+            </p>
+
+            <div>
+              <label htmlFor="otp">6-Digit Verification Code</label>
+              <input
+                id="otp"
+                type="text"
+                value={otp}
+                onChange={(e) => setOtp(e.target.value.trim())}
+                required
+                maxLength={6}
+                minLength={6}
+                placeholder="123456"
+                style={{ letterSpacing: '4px', fontSize: '18px', textAlign: 'center', fontWeight: 'bold' }}
+              />
+            </div>
+
+            <button type="submit" disabled={loading}>
+              {loading ? 'Verifying OTP...' : 'Verify OTP & Complete Login'}
+            </button>
+
+            <div style={{ marginTop: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={resending}
+                style={{ background: 'transparent', color: '#2563eb', border: 'none', padding: '0', cursor: 'pointer', textDecoration: 'underline', fontSize: '14px' }}
+              >
+                {resending ? 'Sending...' : 'Resend OTP'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                style={{ background: 'transparent', color: '#6b7280', border: 'none', padding: '0', cursor: 'pointer', fontSize: '14px' }}
+              >
+                Back to Login
+              </button>
+            </div>
+          </form>
         )}
 
-        <p style={{ marginTop: '16px' }}>
+        <p style={{ marginTop: '20px' }}>
           Don't have an account? <Link to="/register">Register here</Link>
         </p>
       </div>

@@ -35,7 +35,7 @@ describe('Auth Endpoints & Health Route', () => {
   });
 
   describe('POST /api/auth/register', () => {
-    it('should register a new user with isVerified: false and create verification token', async () => {
+    it('should register a new user with isVerified: false and generate 6-digit OTP', async () => {
       const res = await request(app).post('/api/auth/register').send({
         name: 'Test User',
         email: 'test@example.com',
@@ -43,18 +43,16 @@ describe('Auth Endpoints & Health Route', () => {
       });
 
       expect(res.statusCode).toEqual(201);
-      expect(res.body).toHaveProperty('message');
-      expect(res.body.user).toHaveProperty('_id');
-      expect(res.body.user).toHaveProperty('name', 'Test User');
-      expect(res.body.user).toHaveProperty('email', 'test@example.com');
-      expect(res.body.user).toHaveProperty('isVerified', false);
-      expect(res.body.user).not.toHaveProperty('passwordHash');
+      expect(res.body).toHaveProperty('requireOtp', true);
+      expect(res.body).toHaveProperty('purpose', 'registration');
+      expect(res.body).toHaveProperty('email', 'test@example.com');
 
-      const userInDb = await User.findOne({ email: 'test@example.com' }).select('+verificationToken +verificationTokenExpires');
+      const userInDb = await User.findOne({ email: 'test@example.com' }).select('+otpCode +otpExpires +otpPurpose');
       expect(userInDb).not.toBeNull();
       expect(userInDb.isVerified).toBe(false);
-      expect(userInDb.verificationToken).toBeDefined();
-      expect(userInDb.verificationTokenExpires).toBeDefined();
+      expect(userInDb.otpCode).toMatch(/^\d{6}$/);
+      expect(userInDb.otpExpires).toBeDefined();
+      expect(userInDb.otpPurpose).toBe('registration');
     });
 
     it('should reject registration with duplicate email', async () => {
@@ -86,97 +84,120 @@ describe('Auth Endpoints & Health Route', () => {
     });
   });
 
-  describe('SMTP Email Verification Flow', () => {
-    let unverifiedUser;
-    let verificationToken;
+  describe('Registration & Login 6-Digit OTP Flow', () => {
+    let registrationOtp;
 
     beforeEach(async () => {
       await request(app).post('/api/auth/register').send({
-        name: 'Verify User',
-        email: 'verify@example.com',
+        name: 'OTP User',
+        email: 'otpuser@example.com',
         password: 'password123',
       });
 
-      unverifiedUser = await User.findOne({ email: 'verify@example.com' }).select('+verificationToken');
-      verificationToken = unverifiedUser.verificationToken;
+      const user = await User.findOne({ email: 'otpuser@example.com' }).select('+otpCode');
+      registrationOtp = user.otpCode;
     });
 
-    it('should block unverified user from logging in with 403 Forbidden', async () => {
-      const res = await request(app).post('/api/auth/login').send({
-        email: 'verify@example.com',
-        password: 'password123',
-      });
-
-      expect(res.statusCode).toEqual(403);
-      expect(res.body).toHaveProperty('error', 'Please verify your email address before logging in.');
-      expect(res.body).toHaveProperty('isVerified', false);
-    });
-
-    it('should fail email verification with invalid token', async () => {
-      const res = await request(app).post('/api/auth/verify-email').send({
-        token: 'invalid_token_12345',
+    it('should fail registration OTP verification with invalid code', async () => {
+      const res = await request(app).post('/api/auth/verify-registration-otp').send({
+        email: 'otpuser@example.com',
+        otp: '000000',
       });
 
       expect(res.statusCode).toEqual(400);
-      expect(res.body).toHaveProperty('error', 'Invalid or expired verification token');
+      expect(res.body).toHaveProperty('error', 'Invalid or expired OTP code');
     });
 
-    it('should verify email successfully with valid token and return JWT token', async () => {
-      const res = await request(app).post('/api/auth/verify-email').send({
-        token: verificationToken,
+    it('should verify registration successfully with valid 6-digit OTP and return JWT token', async () => {
+      const res = await request(app).post('/api/auth/verify-registration-otp').send({
+        email: 'otpuser@example.com',
+        otp: registrationOtp,
       });
 
       expect(res.statusCode).toEqual(200);
       expect(res.body).toHaveProperty('token');
       expect(res.body.user).toHaveProperty('isVerified', true);
 
-      const updatedUser = await User.findOne({ email: 'verify@example.com' });
+      const updatedUser = await User.findOne({ email: 'otpuser@example.com' });
       expect(updatedUser.isVerified).toBe(true);
-      expect(updatedUser.verificationToken).toBeUndefined();
     });
 
-    it('should allow verified user to log in successfully', async () => {
-      // Verify first
-      await request(app).post('/api/auth/verify-email').send({
-        token: verificationToken,
+    it('should initiate 2-step OTP login when password is correct', async () => {
+      // First verify registration
+      await request(app).post('/api/auth/verify-registration-otp').send({
+        email: 'otpuser@example.com',
+        otp: registrationOtp,
       });
 
-      // Login
+      // Submit password
       const res = await request(app).post('/api/auth/login').send({
-        email: 'verify@example.com',
+        email: 'otpuser@example.com',
         password: 'password123',
       });
 
       expect(res.statusCode).toEqual(200);
-      expect(res.body).toHaveProperty('token');
-      expect(res.body.user.email).toEqual('verify@example.com');
-      expect(res.body.user.isVerified).toEqual(true);
+      expect(res.body).toHaveProperty('requireOtp', true);
+      expect(res.body).toHaveProperty('purpose', 'login');
+      expect(res.body).toHaveProperty('email', 'otpuser@example.com');
+
+      const userAfterLoginAttempt = await User.findOne({ email: 'otpuser@example.com' }).select('+otpCode +otpPurpose');
+      expect(userAfterLoginAttempt.otpPurpose).toBe('login');
+      expect(userAfterLoginAttempt.otpCode).toMatch(/^\d{6}$/);
     });
 
-    it('should resend verification token for unverified user', async () => {
-      const res = await request(app).post('/api/auth/resend-verification').send({
-        email: 'verify@example.com',
+    it('should complete login with valid 6-digit login OTP code', async () => {
+      // 1. Verify registration
+      await request(app).post('/api/auth/verify-registration-otp').send({
+        email: 'otpuser@example.com',
+        otp: registrationOtp,
+      });
+
+      // 2. Submit password to generate login OTP
+      await request(app).post('/api/auth/login').send({
+        email: 'otpuser@example.com',
+        password: 'password123',
+      });
+
+      const userWithLoginOtp = await User.findOne({ email: 'otpuser@example.com' }).select('+otpCode');
+      const loginOtp = userWithLoginOtp.otpCode;
+
+      // 3. Verify login OTP
+      const res = await request(app).post('/api/auth/verify-login-otp').send({
+        email: 'otpuser@example.com',
+        otp: loginOtp,
+      });
+
+      expect(res.statusCode).toEqual(200);
+      expect(res.body).toHaveProperty('token');
+      expect(res.body.user.email).toBe('otpuser@example.com');
+    });
+
+    it('should resend 6-digit OTP code', async () => {
+      const res = await request(app).post('/api/auth/resend-otp').send({
+        email: 'otpuser@example.com',
+        purpose: 'registration',
       });
 
       expect(res.statusCode).toEqual(200);
       expect(res.body).toHaveProperty('message');
 
-      const userAfterResend = await User.findOne({ email: 'verify@example.com' }).select('+verificationToken');
-      expect(userAfterResend.verificationToken).toBeDefined();
+      const userAfterResend = await User.findOne({ email: 'otpuser@example.com' }).select('+otpCode');
+      expect(userAfterResend.otpCode).toMatch(/^\d{6}$/);
     });
   });
 
   describe('GET /api/auth/me', () => {
-    it('should return profile for authenticated verified user', async () => {
+    it('should return profile for authenticated user', async () => {
       await request(app).post('/api/auth/register').send({
         name: 'Me User',
         email: 'me@example.com',
         password: 'password123',
       });
 
-      const user = await User.findOne({ email: 'me@example.com' }).select('+verificationToken');
-      const verifyRes = await request(app).post('/api/auth/verify-email').send({
-        token: user.verificationToken,
+      const user = await User.findOne({ email: 'me@example.com' }).select('+otpCode');
+      const verifyRes = await request(app).post('/api/auth/verify-registration-otp').send({
+        email: 'me@example.com',
+        otp: user.otpCode,
       });
 
       const token = verifyRes.body.token;

@@ -24,12 +24,17 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-    verificationToken: {
+    otpCode: {
       type: String,
       select: false,
     },
-    verificationTokenExpires: {
+    otpExpires: {
       type: Date,
+      select: false,
+    },
+    otpPurpose: {
+      type: String,
+      enum: ['registration', 'login'],
       select: false,
     },
   },
@@ -41,8 +46,9 @@ const userSchema = new mongoose.Schema(
 userSchema.set('toJSON', {
   transform: (doc, ret) => {
     delete ret.passwordHash;
-    delete ret.verificationToken;
-    delete ret.verificationTokenExpires;
+    delete ret.otpCode;
+    delete ret.otpExpires;
+    delete ret.otpPurpose;
     delete ret.__v;
     return ret;
   },
