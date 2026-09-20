@@ -11,11 +11,18 @@ const getTransporter = () => {
   const port = parseInt(process.env.SMTP_PORT || '587', 10);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const secure = process.env.SMTP_SECURE === 'true';
+
+  // Determine secure mode: true for port 465, false for 587, 2525, 1022, 1109, etc.
+  let secure = port === 465;
+  if (process.env.SMTP_SECURE !== undefined) {
+    secure = process.env.SMTP_SECURE === 'true';
+  }
 
   if (!user || !pass) {
     return null;
   }
+
+  console.log(`[SMTP Mailer Init] Creating SMTP transporter for host=${host}, port=${port}, secure=${secure}, user=${user}`);
 
   cachedTransporter = nodemailer.createTransport({
     host,
@@ -24,6 +31,9 @@ const getTransporter = () => {
     auth: {
       user,
       pass,
+    },
+    tls: {
+      rejectUnauthorized: false, // Allow STARTTLS / custom certificates
     },
     pool: true,
     maxConnections: 5,
@@ -62,7 +72,7 @@ const sendOtpEmail = async (email, otp, purpose = 'registration') => {
       </p>
       <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
       <p style="color: #94a3b8; font-size: 12px; margin: 0; text-align: center;">
-        SRS Ambiguity Detector &bull; Brevo SMTP Service
+        SRS Ambiguity Detector &bull; SMTP Service
       </p>
     </div>
   `;
@@ -70,7 +80,8 @@ const sendOtpEmail = async (email, otp, purpose = 'registration') => {
   const textContent = `${title}:\n\nYour 6-digit OTP code is: ${otp}\n\nThis code will expire in 10 minutes.`;
 
   if (!transporter) {
-    console.log(`[Brevo SMTP Mailer Notice] SMTP credentials not set. OTP for ${email} (${purpose}): ${otp}`);
+    console.log(`[SMTP Mailer Warning] Real email NOT sent because SMTP_USER or SMTP_PASS is missing in backend/.env.`);
+    console.log(`[SMTP Mailer OTP Debug] Generated OTP for ${email} (${purpose}): ${otp}`);
     return { success: true, mocked: true, otp };
   }
 
@@ -82,10 +93,11 @@ const sendOtpEmail = async (email, otp, purpose = 'registration') => {
       text: textContent,
       html: htmlContent,
     });
-    console.log(`[Brevo SMTP Mailer] OTP email sent to ${email} (${purpose}): ${info.messageId}`);
+    console.log(`[SMTP Mailer] Email sent successfully to ${email} (${purpose}): ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error(`[Brevo SMTP Mailer Error] Failed to send OTP to ${email}:`, error);
+    console.error(`[SMTP Mailer Error] Failed to send OTP to ${email}:`, error.message);
+    cachedTransporter = null; // Reset transporter pool on error so fresh connection is attempted next time
     return { success: false, error: error.message, otp };
   }
 };
