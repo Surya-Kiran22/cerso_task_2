@@ -21,6 +21,13 @@ const generateOtp = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
+// Helper for non-blocking email dispatch
+const dispatchOtpEmail = (email, otpCode, purpose) => {
+  sendOtpEmail(email, otpCode, purpose).catch((err) => {
+    console.error(`[Async Email Dispatch Error] Failed to send OTP to ${email}:`, err);
+  });
+};
+
 // @route   POST /api/auth/register
 // @desc    Register a new user & send 6-digit registration OTP email
 // @access  Public
@@ -56,7 +63,8 @@ router.post(
       otpPurpose: 'registration',
     });
 
-    await sendOtpEmail(user.email, otpCode, 'registration');
+    // Send OTP email in background for instant API response
+    dispatchOtpEmail(user.email, otpCode, 'registration');
 
     res.status(201).json({
       requireOtp: true,
@@ -150,7 +158,7 @@ router.post(
       user.otpPurpose = 'registration';
       await user.save();
 
-      await sendOtpEmail(user.email, otpCode, 'registration');
+      dispatchOtpEmail(user.email, otpCode, 'registration');
 
       return res.status(403).json({
         requireOtp: true,
@@ -165,7 +173,7 @@ router.post(
     user.otpPurpose = 'login';
     await user.save();
 
-    await sendOtpEmail(user.email, otpCode, 'login');
+    dispatchOtpEmail(user.email, otpCode, 'login');
 
     res.json({
       requireOtp: true,
@@ -253,7 +261,7 @@ router.post(
     user.otpPurpose = targetPurpose;
     await user.save();
 
-    await sendOtpEmail(user.email, otpCode, targetPurpose);
+    dispatchOtpEmail(user.email, otpCode, targetPurpose);
 
     res.json({
       message: `A new 6-digit OTP code has been sent to ${user.email}.`,

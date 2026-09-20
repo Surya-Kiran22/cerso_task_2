@@ -1,6 +1,12 @@
 const nodemailer = require('nodemailer');
 
-const createTransporter = () => {
+let cachedTransporter = null;
+
+const getTransporter = () => {
+  if (cachedTransporter) {
+    return cachedTransporter;
+  }
+
   const host = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
   const port = parseInt(process.env.SMTP_PORT || '587', 10);
   const user = process.env.SMTP_USER;
@@ -11,7 +17,7 @@ const createTransporter = () => {
     return null;
   }
 
-  return nodemailer.createTransport({
+  cachedTransporter = nodemailer.createTransport({
     host,
     port,
     secure,
@@ -19,19 +25,24 @@ const createTransporter = () => {
       user,
       pass,
     },
+    pool: true,
+    maxConnections: 5,
+    maxMessages: 100,
+    rateDelta: 1000,
+    rateLimit: 10,
   });
+
+  return cachedTransporter;
 };
 
 const sendOtpEmail = async (email, otp, purpose = 'registration') => {
   const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'no-reply@srs-ambiguity-detector.com';
-  const transporter = createTransporter();
+  const transporter = getTransporter();
 
   const title = purpose === 'login' ? 'Login Verification Code' : 'Email Verification Code';
   const actionText = purpose === 'login' 
     ? 'Use the verification code below to complete your login:'
     : 'Thank you for registering with SRS Ambiguity Detector. Use the verification code below to activate your account:';
-
-  const formattedOtp = otp.toString().split('').join(' ');
 
   const htmlContent = `
     <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background-color: #ffffff;">
